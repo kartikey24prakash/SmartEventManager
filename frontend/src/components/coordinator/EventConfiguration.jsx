@@ -52,7 +52,7 @@ export default function EventConfiguration({
   if (!event || !workspace || !form) {
     return (
       <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500 shadow-sm">
-        Select an event to view event-day controls.
+        Select an event to view setup and lifecycle controls.
       </div>
     );
   }
@@ -98,10 +98,9 @@ export default function EventConfiguration({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">Event-Day Control</h2>
+        <h2 className="text-2xl font-bold text-slate-900">Event Setup</h2>
         <p className="text-sm text-slate-500">
-          Coordinators manage operational setup here, including participation rules, dates,
-          capacity, and live event status.
+          Configure event details, participation rules, dates, capacity, and lifecycle status.
         </p>
       </div>
 
@@ -115,6 +114,27 @@ export default function EventConfiguration({
             <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
               {event.status}
             </span>
+          </div>
+
+          <div className="mb-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Mode</div>
+              <div className="mt-2 text-sm font-semibold capitalize text-slate-900">
+                {event.participationType || "individual"}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Category</div>
+              <div className="mt-2 text-sm font-semibold capitalize text-slate-900">
+                {event.eventType || "other"}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Capacity</div>
+              <div className="mt-2 text-sm font-semibold text-slate-900">
+                {event.maxParticipants || "Unlimited"}
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -155,7 +175,10 @@ export default function EventConfiguration({
             onSubmit={handleSaveConfiguration}
             className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
           >
-            <div className="mb-4 text-lg font-bold text-slate-900">Configuration Control</div>
+            <div className="mb-1 text-lg font-bold text-slate-900">Configuration</div>
+            <div className="mb-4 text-sm text-slate-500">
+              Update the live setup details for this event.
+            </div>
             <div className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -183,8 +206,8 @@ export default function EventConfiguration({
                     onChange={setField("participationType")}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-violet-300"
                   >
-                    <option value="individual">individual</option>
-                    <option value="team">team</option>
+                    <option value="individual">Individual</option>
+                    <option value="team">Team</option>
                   </select>
                 </div>
               </div>
@@ -236,58 +259,93 @@ export default function EventConfiguration({
               ) : null}
 
               <div className="grid gap-4 md:grid-cols-3">
-                <input
-                  type="date"
-                  value={form.registrationStartDate}
-                  onChange={setField("registrationStartDate")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
-                />
-                <input
-                  type="date"
-                  value={form.registrationEndDate}
-                  onChange={setField("registrationEndDate")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
-                />
-                <input
-                  type="date"
-                  value={form.eventDate}
-                  onChange={setField("eventDate")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
-                />
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Registration Start
+                  </label>
+                  <input
+                    type="date"
+                    value={form.registrationStartDate}
+                    onChange={setField("registrationStartDate")}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Registration End
+                  </label>
+                  <input
+                    type="date"
+                    value={form.registrationEndDate}
+                    onChange={setField("registrationEndDate")}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Event Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.eventDate}
+                    onChange={setField("eventDate")}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
+                  />
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <input
-                  type="text"
-                  value={form.venue}
-                  onChange={setField("venue")}
-                  placeholder="Venue"
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
-                />
-                <input
-                  type="number"
-                  value={form.maxParticipants}
-                  onChange={setField("maxParticipants")}
-                  placeholder="Max participants"
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Venue
+                  </label>
+                  <input
+                    type="text"
+                    value={form.venue}
+                    onChange={setField("venue")}
+                    placeholder="Venue"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Max Participants
+                  </label>
+                  <input
+                    type="number"
+                    value={form.maxParticipants}
+                    onChange={setField("maxParticipants")}
+                    placeholder="Max participants"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Rules and Notes
+                </label>
+                <textarea
+                  rows={4}
+                  value={form.rules}
+                  onChange={setField("rules")}
+                  placeholder="Rules and operational notes"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
                 />
               </div>
 
-              <textarea
-                rows={4}
-                value={form.rules}
-                onChange={setField("rules")}
-                placeholder="Rules and operational notes"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
-              />
-
-              <textarea
-                rows={3}
-                value={form.prizes}
-                onChange={setField("prizes")}
-                placeholder="Prizes (comma separated)"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
-              />
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Prizes
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.prizes}
+                  onChange={setField("prizes")}
+                  placeholder="Prizes (comma separated)"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-violet-300"
+                />
+              </div>
             </div>
 
             <button
@@ -300,7 +358,10 @@ export default function EventConfiguration({
           </form>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 text-lg font-bold text-slate-900">Lifecycle Actions</div>
+            <div className="mb-1 text-lg font-bold text-slate-900">Lifecycle</div>
+            <div className="mb-4 text-sm text-slate-500">
+              Move the event through its active stages when operations are ready.
+            </div>
             <div className="space-y-3">
               {statusButtons.map((button) => (
                 <button
@@ -321,7 +382,10 @@ export default function EventConfiguration({
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 text-lg font-bold text-slate-900">Pending Tasks</div>
+            <div className="mb-1 text-lg font-bold text-slate-900">Event Checklist</div>
+            <div className="mb-4 text-sm text-slate-500">
+              Use this checklist to confirm what still needs attention.
+            </div>
             {(workspace.tasks || []).length === 0 ? (
               <div className="text-sm text-slate-500">No pending tasks for this event.</div>
             ) : (

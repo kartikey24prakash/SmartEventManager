@@ -16,7 +16,7 @@ const navItems = [
   { id: "dashboard", label: "Dashboard" },
   { id: "events", label: "My Events" },
   { id: "stats", label: "Analytics" },
-  { id: "configuration", label: "Event-Day Control" },
+  { id: "configuration", label: "Event Setup" },
   { id: "participants", label: "Participants" },
   { id: "teams", label: "Teams" },
   { id: "winners", label: "Winners" },
@@ -95,16 +95,23 @@ export default function CoordinatorDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
+          <div className="text-xs font-black uppercase tracking-[0.28em] text-violet-600">
+            Coordinator Workspace
+          </div>
           <h1 className="text-3xl font-bold text-slate-900">
             Welcome back, {user?.name || "Coordinator"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage your assigned events, live participation, winners, and certificates.
+            Run event operations with a clear flow from setup to certificates.
           </p>
         </div>
         {selectedEvent ? (
-          <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700">
-            Active Event: <span className="font-semibold">{selectedEvent.name}</span>
+          <div className="rounded-3xl border border-violet-200 bg-violet-50 px-5 py-4 text-sm text-violet-700">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-violet-500">Active Event</div>
+            <div className="mt-1 font-semibold">{selectedEvent.name}</div>
+            <div className="mt-1 text-xs text-violet-600/80">
+              {selectedEvent.status} • {selectedEvent.participationType || "event"}
+            </div>
           </div>
         ) : null}
       </div>
@@ -113,80 +120,84 @@ export default function CoordinatorDashboard() {
         {cards.map((card, index) => (
           <div
             key={card.label}
-            className={`rounded-3xl bg-gradient-to-br ${cardPalette[index]} p-5 text-white shadow-lg`}
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <div className="text-sm font-medium text-white/80">{card.label}</div>
-            <div className="mt-3 text-4xl font-black">{card.value}</div>
-            <div className="mt-2 text-sm text-white/80">{card.sub}</div>
+            <div
+              className={`inline-flex rounded-2xl bg-gradient-to-br px-3 py-1.5 text-xs font-bold uppercase tracking-[0.18em] text-white ${cardPalette[index]}`}
+            >
+              {card.label}
+            </div>
+            <div className="mt-4 text-4xl font-black text-slate-950">{card.value}</div>
+            <div className="mt-2 text-sm text-slate-500">{card.sub}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <div className="text-xl font-bold text-slate-900">Assigned Event Snapshot</div>
-              <div className="text-sm text-slate-500">Choose an event and jump into event-day control.</div>
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="space-y-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="text-xl font-bold text-slate-900">Assigned Events</div>
+                <div className="text-sm text-slate-500">
+                  Choose an event and jump straight into operations.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveView("events")}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-violet-300 hover:text-violet-700"
+              >
+                View all
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveView("events")}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-violet-300 hover:text-violet-700"
-            >
-              View all
-            </button>
+            <AssignedEvents
+              events={events.slice(0, 4)}
+              selectedEventId={selectedEventId}
+              loading={loading}
+              onSelectEvent={async (eventId) => {
+                await actions.selectEvent(eventId);
+                setActiveView("configuration");
+              }}
+            />
           </div>
-          <AssignedEvents
-            events={events.slice(0, 4)}
-            selectedEventId={selectedEventId}
-            loading={loading}
-            onSelectEvent={async (eventId) => {
-              await actions.selectEvent(eventId);
-              setActiveView("configuration");
-            }}
-          />
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 text-xl font-bold text-slate-900">Pending Tasks</div>
-            {(workspace?.tasks || []).length === 0 ? (
-              <div className="text-sm text-slate-500">No pending tasks right now.</div>
-            ) : (
-              <div className="space-y-3">
-                {workspace.tasks.map((task) => (
-                  <div key={task.id} className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="font-semibold text-slate-900">{task.label}</div>
-                    <div className="mt-1 text-xs uppercase tracking-wide text-slate-400">
-                      Priority: {task.priority}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 text-xl font-bold text-slate-900">Quick Actions</div>
-            <div className="grid gap-3">
-              {[
-                { label: "Mark Event Ongoing", onClick: () => actions.updateEventStatus("ongoing") },
-                { label: "Open Participants", onClick: () => setActiveView("participants") },
-                { label: "Declare Winners", onClick: () => setActiveView("winners") },
-                { label: "Generate Certificates", onClick: () => setActiveView("certificates") },
-              ].map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  disabled={actionLoading || !selectedEvent}
-                  onClick={action.onClick}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {action.label}
-                </button>
-              ))}
+          <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-violet-900 p-6 text-white shadow-lg">
+            <div className="text-xs font-bold uppercase tracking-[0.24em] text-violet-200">
+              Event Pulse
             </div>
+            <div className="mt-3 text-2xl font-bold">
+              {selectedEvent ? selectedEvent.name : "Select an event"}
+            </div>
+            <div className="mt-2 text-sm text-white/70">
+              {selectedEvent
+                ? "Attendance, winners, and certificates are all managed from this workspace."
+                : "Choose an assigned event to unlock live coordination tools."}
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-2xl bg-white/10 px-4 py-3">
+                <div className="text-white/60">Status</div>
+                <div className="mt-1 font-semibold text-white">
+                  {selectedEvent?.status || "Not selected"}
+                </div>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-4 py-3">
+                <div className="text-white/60">Mode</div>
+                <div className="mt-1 font-semibold text-white">
+                  {selectedEvent?.participationType || "Not selected"}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={actionLoading || !selectedEvent}
+              onClick={() => actions.updateEventStatus("ongoing")}
+              className="mt-6 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Mark Event Ongoing
+            </button>
           </div>
         </div>
       </div>
@@ -298,7 +309,7 @@ export default function CoordinatorDashboard() {
       roleLabel="Coordinator"
       roleCaption="Operations Workspace"
       title={selectedEvent?.name || "Select an assigned event"}
-      subtitle="Run live event operations, attendance, winners, and certificates from one coordinated workspace."
+      subtitle="Manage setup, attendance, winners, and certificates from one coordinated workspace."
       navItems={navItems}
       activeId={activeView}
       onSelect={setActiveView}

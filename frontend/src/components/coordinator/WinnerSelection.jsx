@@ -1,7 +1,7 @@
 const podium = [
-  { rank: 1, label: "1st Place", icon: "🥇" },
-  { rank: 2, label: "2nd Place", icon: "🥈" },
-  { rank: 3, label: "3rd Place", icon: "🥉" },
+  { rank: 1, label: "1st Place" },
+  { rank: 2, label: "2nd Place" },
+  { rank: 3, label: "3rd Place" },
 ];
 
 const normalizeCandidates = (participationType, registrations, teams) => {
@@ -11,7 +11,7 @@ const normalizeCandidates = (participationType, registrations, teams) => {
       .map((team) => ({
         id: team._id,
         name: team.teamName,
-        subtitle: `${team.members.length} members · ${team.leaderId?.name || "Leader"}`,
+        subtitle: `${team.members.length} members • ${team.leaderId?.name || "Leader"}`,
         rank: team.isWinner ? team.rank : null,
       }));
   }
@@ -70,49 +70,56 @@ export default function WinnerSelection({
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-800">Current Podium</div>
-          {podium.map((slot) => {
-            const winner = currentWinnerForRank(slot.rank);
-            return (
-              <div
-                key={slot.rank}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
-              >
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {slot.icon} {slot.label}
-                  </div>
-                  <div className="mt-1 text-sm text-slate-500">
-                    {winner?.label || "Not assigned"}
-                  </div>
-                </div>
-                {winner ? (
-                  <button
-                    type="button"
-                    disabled={actionLoading}
-                    onClick={() => onClearWinner?.(winner.entityId)}
-                    className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
-                  >
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {podium.map((slot) => {
+          const winner = currentWinnerForRank(slot.rank);
 
-        <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-800">
-            Eligible {participationType === "team" ? "Teams" : "Participants"}
-          </div>
-          {candidates.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
-              No participated {participationType === "team" ? "teams" : "participants"} yet.
+          return (
+            <div
+              key={slot.rank}
+              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-amber-600">
+                Rank {slot.rank}
+              </div>
+              <div className="mt-2 text-lg font-bold text-slate-900">{slot.label}</div>
+              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4">
+                <div className="text-sm font-semibold text-slate-900">
+                  {winner?.label || "Not assigned"}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {winner ? "Winner selected" : "No winner assigned yet"}
+                </div>
+              </div>
+              {winner ? (
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => onClearWinner?.(winner.entityId)}
+                  className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
+                >
+                  Clear Rank
+                </button>
+              ) : null}
             </div>
-          ) : (
-            candidates.map((candidate) => (
+          );
+        })}
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-1 text-lg font-bold text-slate-900">
+          Eligible {participationType === "team" ? "Teams" : "Participants"}
+        </div>
+        <div className="mb-4 text-sm text-slate-500">
+          Assign ranks directly from the eligible list below.
+        </div>
+        {candidates.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500">
+            No participated {participationType === "team" ? "teams" : "participants"} yet.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {candidates.map((candidate) => (
               <div
                 key={candidate.id}
                 className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
@@ -135,14 +142,14 @@ export default function WinnerSelection({
                       onClick={() => onAssignWinner?.(candidate.id, slot.rank)}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-violet-300 hover:text-violet-700"
                     >
-                      {slot.icon} {slot.rank}
+                      Assign {slot.rank}
                     </button>
                   ))}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,14 @@ const statusTone = {
   cancelled: "bg-rose-100 text-rose-700",
 };
 
+const filterLabels = {
+  all: "All",
+  open: "Open",
+  ongoing: "Ongoing",
+  completed: "Completed",
+  draft: "Draft",
+};
+
 export default function AssignedEvents({
   events = [],
   selectedEventId,
@@ -41,7 +49,7 @@ export default function AssignedEvents({
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Assigned Events</h2>
           <p className="text-sm text-slate-500">
-            Select an event to manage registrations, attendance, winners, and certificates.
+            Choose an event to manage setup, attendance, winners, and certificates.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -67,7 +75,7 @@ export default function AssignedEvents({
           type="text"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search events..."
+          placeholder="Search by event name"
           className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-violet-400"
         />
         <div className="flex flex-wrap gap-2">
@@ -82,7 +90,7 @@ export default function AssignedEvents({
                   : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
               }`}
             >
-              {item}
+              {filterLabels[item]}
             </button>
           ))}
         </div>
@@ -94,7 +102,7 @@ export default function AssignedEvents({
         </div>
       ) : filteredEvents.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500 shadow-sm">
-          No events match the current filters.
+          No events match the current search or status filter.
         </div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
@@ -109,27 +117,36 @@ export default function AssignedEvents({
                 type="button"
                 onClick={() => onSelectEvent?.(event._id)}
                 className={`rounded-3xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                  selected
-                    ? "border-violet-400 ring-2 ring-violet-100"
-                    : "border-slate-200"
+                  selected ? "border-violet-400 ring-2 ring-violet-100" : "border-slate-200"
                 }`}
               >
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
                     <div className="text-lg font-bold text-slate-900">{event.name}</div>
                     <div className="mt-1 text-sm text-slate-500">
-                      {event.eventType} · {event.participationType}
+                      {event.eventType} • {event.participationType}
                     </div>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
-                    {event.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
+                      {event.status}
+                    </span>
+                    {selected ? (
+                      <span className="rounded-full bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-violet-700">
+                        Active
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="grid gap-3 text-sm text-slate-500 sm:grid-cols-2">
                   <div>
                     <div className="font-medium text-slate-700">Event Date</div>
-                    <div>{event.eventDate ? new Date(event.eventDate).toLocaleDateString("en-IN") : "TBD"}</div>
+                    <div>
+                      {event.eventDate
+                        ? new Date(event.eventDate).toLocaleDateString("en-IN")
+                        : "TBD"}
+                    </div>
                   </div>
                   <div>
                     <div className="font-medium text-slate-700">Venue</div>
@@ -142,6 +159,15 @@ export default function AssignedEvents({
                   <div>
                     <div className="font-medium text-slate-700">Capacity</div>
                     <div>{event.maxParticipants || "Unlimited"}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    {selected ? "Currently selected" : "Click to manage"}
+                  </div>
+                  <div className="text-sm font-semibold text-violet-700">
+                    {selected ? "Viewing event" : "Open event"}
                   </div>
                 </div>
               </button>

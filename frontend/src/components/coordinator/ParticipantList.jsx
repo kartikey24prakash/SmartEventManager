@@ -39,12 +39,25 @@ export default function ParticipantList({
     });
   }, [registrations, search, statusFilter]);
 
+  const summary = useMemo(
+    () => ({
+      total: registrations.length,
+      participated: registrations.filter((registration) => registration.status === "participated")
+        .length,
+      absent: registrations.filter((registration) => registration.status === "absent").length,
+      winners: registrations.filter((registration) => registration.isWinner).length,
+    }),
+    [registrations]
+  );
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Participants</h2>
-          <p className="text-sm text-slate-500">{eventName}</p>
+          <p className="text-sm text-slate-500">
+            Manage attendance and participant status for {eventName || "the selected event"}.
+          </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
@@ -66,6 +79,22 @@ export default function ParticipantList({
             <option value="withdrawn">Withdrawn</option>
           </select>
         </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Total Participants", value: summary.total },
+          { label: "Participated", value: summary.participated },
+          { label: "Absent", value: summary.absent },
+          { label: "Winners", value: summary.winners },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <div className="text-2xl font-bold text-slate-900">{item.value}</div>
+            <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+              {item.label}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">

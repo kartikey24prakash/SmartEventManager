@@ -126,17 +126,17 @@ export default function DashboardShell({
         </aside>
 
         {/* Overlay for mobile */}
-        {sidebarOpen && (
+        {sidebarOpen ? (
           <div
             className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm xl:hidden"
             onClick={() => setSidebarOpen(false)}
           />
-        )}
+        ) : null}
 
-        {/* Main content - now adjusts based on sidebar state */}
+        {/* Main content */}
         <main 
           className={`flex-1 transition-all duration-300 ${
-            sidebarOpen ? "ml-80" : "ml-0"
+            sidebarOpen ? "xl:ml-80" : "xl:ml-0"
           }`}
         >
           <div className="border-b border-white/70 bg-white/70 px-5 py-5 shadow-sm backdrop-blur-xl sm:px-6 lg:px-8">

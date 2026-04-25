@@ -27,12 +27,26 @@ export default function TeamList({
     });
   }, [teams, search, statusFilter]);
 
+  const summary = useMemo(
+    () => ({
+      total: teams.length,
+      participated: teams.filter((team) => team.status === "participated").length,
+      valid: teams.filter(
+        (team) => team.meetsTeamSizeRequirement && team.meetsGenderRequirement
+      ).length,
+      winners: teams.filter((team) => team.isWinner).length,
+    }),
+    [teams]
+  );
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Teams</h2>
-          <p className="text-sm text-slate-500">{eventName}</p>
+          <p className="text-sm text-slate-500">
+            Manage validation, attendance, and team status for {eventName || "the selected event"}.
+          </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
@@ -56,6 +70,22 @@ export default function TeamList({
         </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Total Teams", value: summary.total },
+          { label: "Participated", value: summary.participated },
+          { label: "Valid Teams", value: summary.valid },
+          { label: "Winner Teams", value: summary.winners },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <div className="text-2xl font-bold text-slate-900">{item.value}</div>
+            <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+              {item.label}
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-2">
         {filteredTeams.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500 shadow-sm xl:col-span-2">
@@ -68,7 +98,7 @@ export default function TeamList({
                 <div>
                   <div className="text-lg font-bold text-slate-900">{team.teamName}</div>
                   <div className="text-sm text-slate-500">
-                    Leader: {team.leaderId?.name || "-"} · {team.members.length} members
+                    Leader: {team.leaderId?.name || "-"} • {team.members.length} members
                   </div>
                 </div>
                 <span
@@ -102,9 +132,7 @@ export default function TeamList({
               </div>
 
               <div className="mb-4">
-                <div className="mb-2 text-xs uppercase tracking-wide text-slate-400">
-                  Members
-                </div>
+                <div className="mb-2 text-xs uppercase tracking-wide text-slate-400">Members</div>
                 <div className="flex flex-wrap gap-2">
                   {team.members.map((member) => (
                     <span
