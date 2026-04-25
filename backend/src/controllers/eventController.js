@@ -5,6 +5,25 @@ import Registration from "../model/Registration.js";
 import Team from "../model/Team.js";
 import User from "../model/User.js";
 
+const ADMIN_EDITABLE_FIELDS = ["name", "description"];
+const COORDINATOR_EDITABLE_FIELDS = [
+  "eventType",
+  "participationType",
+  "teamConfig",
+  "registrationStartDate",
+  "registrationEndDate",
+  "maxParticipants",
+  "eventDate",
+  "venue",
+  "rules",
+  "prizes",
+];
+
+const pickFields = (payload, allowedFields) =>
+  Object.fromEntries(
+    Object.entries(payload).filter(([key, value]) => allowedFields.includes(key) && value !== undefined)
+  );
+
 const validateEventPayload = (payload) => {
   if (
     payload.participationType === "team" &&
@@ -60,13 +79,13 @@ const enrichEventsWithCounts = async (events) => {
 
 export const createEvent = async (req, res, next) => {
   try {
-    const validationError = validateEventPayload(req.body);
-    if (validationError) {
-      return res.status(400).json({ message: validationError });
+    if (!req.body.name?.trim()) {
+      return res.status(400).json({ message: "Event name is required" });
     }
 
     const event = await Event.create({
-      ...req.body,
+      name: req.body.name,
+      description: req.body.description,
       createdBy: req.user._id,
     });
 
@@ -143,12 +162,13 @@ export const getEventById = async (req, res, next) => {
 
 export const updateEvent = async (req, res, next) => {
   try {
-    const validationError = validateEventPayload(req.body);
-    if (validationError) {
-      return res.status(400).json({ message: validationError });
+    const payload = pickFields(req.body, ADMIN_EDITABLE_FIELDS);
+
+    if (!payload.name?.trim()) {
+      return res.status(400).json({ message: "Event name is required" });
     }
 
-    const event = await Event.findByIdAndUpdate(req.params.id, req.body, {
+    const event = await Event.findByIdAndUpdate(req.params.id, payload, {
       new: true,
       runValidators: true,
     });
@@ -158,6 +178,30 @@ export const updateEvent = async (req, res, next) => {
     }
 
     res.json({ event });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateEventConfiguration = async (req, res, next) => {
+  try {
+    const payload = pickFields(req.body, COORDINATOR_EDITABLE_FIELDS);
+    const validationError = validateEventPayload(payload);
+
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
+    const event = await Event.findByIdAndUpdate(req.params.eventId, payload, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    res.json({ event, message: "Event configuration updated successfully" });
   } catch (error) {
     next(error);
   }

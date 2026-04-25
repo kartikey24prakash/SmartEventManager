@@ -220,6 +220,7 @@ export default function CoordinatorDashboard() {
           <EventConfiguration
             event={selectedEvent}
             workspace={workspace}
+            onUpdateConfiguration={actions.updateEventConfiguration}
             onUpdateStatus={actions.updateEventStatus}
             actionLoading={actionLoading}
           />

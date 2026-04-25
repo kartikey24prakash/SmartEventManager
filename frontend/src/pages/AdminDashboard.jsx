@@ -43,30 +43,10 @@ const mapEventToForm = (event) => ({
 });
 
 const buildEventPayload = (form) => {
-  const payload = {
+  return {
     name: form.name,
     description: form.description,
-    eventType: form.eventType,
-    participationType: form.participationType,
-    registrationStartDate: form.registrationStartDate || undefined,
-    registrationEndDate: form.registrationEndDate || undefined,
-    eventDate: form.eventDate || undefined,
-    venue: form.venue,
-    maxParticipants: form.maxParticipants ? Number(form.maxParticipants) : undefined,
-    rules: form.rules,
-    prizes: form.prizes,
   };
-
-  if (form.participationType === "team") {
-    payload.teamConfig = {
-      minTeamSize: Number(form.minTeamSize),
-      maxTeamSize: Number(form.maxTeamSize),
-      genderRequirement: form.genderRequirement,
-      allowCrossInstitution: Boolean(form.allowCrossInstitution),
-    };
-  }
-
-  return payload;
 };
 
 export default function AdminDashboard() {

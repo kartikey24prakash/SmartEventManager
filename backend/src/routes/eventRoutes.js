@@ -7,6 +7,7 @@ import {
   getEventById,
   getEvents,
   removeCoordinator,
+  updateEventConfiguration,
   updateEventLifecycleStatus,
   updateEvent,
 } from "../controllers/eventController.js";
@@ -33,6 +34,13 @@ router.get("/:id", getEventById);
 router.post("/", authMiddleware, allowRoles("admin"), createEvent);
 router.put("/:id", authMiddleware, allowRoles("admin"), updateEvent);
 router.delete("/:id", authMiddleware, allowRoles("admin"), deleteEvent);
+router.patch(
+  "/:eventId/configuration",
+  authMiddleware,
+  allowRoles("coordinator"),
+  ensureCoordinatorEventAccess,
+  updateEventConfiguration
+);
 
 router.post("/:eventId/coordinators", authMiddleware, allowRoles("admin"), assignCoordinator);
 router.delete(

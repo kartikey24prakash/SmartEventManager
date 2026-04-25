@@ -20,6 +20,11 @@ export const updateEventStatus = async (eventId, status) => {
   return data;
 };
 
+export const updateEventConfiguration = async (eventId, payload) => {
+  const { data } = await api.patch(`/events/${eventId}/configuration`, payload);
+  return data;
+};
+
 export const updateRegistrationStatus = async (eventId, registrationId, status) => {
   const { data } = await api.patch(`/events/${eventId}/registrations/${registrationId}/status`, {
     status,
@@ -85,3 +90,10 @@ export const generateEventCertificates = async (eventId, certificateType) => {
   });
   return data;
 };
+
+// export const generateEventCertificates = async (eventId, certificateType) => {
+//   const response = await api.post(`/certificates/batch/${eventId}`, {
+//     certificateType,
+//   });
+//   return response.data; // Return the data so it can be used
+// };

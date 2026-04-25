@@ -12,6 +12,7 @@ import {
   markTeamWinner,
   removeParticipantFromEvent,
   removeTeamFromEvent,
+  updateEventConfiguration,
   updateEventStatus,
   updateRegistrationStatus,
   updateTeamStatus,
@@ -157,15 +158,21 @@ export default function useCoordinatorData() {
   const runAction = useCallback(
     async (task) => {
       if (!selectedEventId) {
-        return;
+        return null;
       }
 
       setActionLoading(true);
       setError("");
 
       try {
-        await task(selectedEventId);
+        // Execute the task and capture the result
+        const result = await task(selectedEventId);
+        
+        // Refresh data after action
         await Promise.all([loadSummary(), loadEventData(selectedEventId)]);
+        
+        // Return the result so components can use it
+        return result;
       } catch (err) {
         setError(err.response?.data?.message || "Coordinator action failed.");
         throw err;
@@ -180,6 +187,8 @@ export default function useCoordinatorData() {
     () => ({
       selectEvent,
       refreshAll,
+      updateEventConfiguration: (payload) =>
+        runAction((eventId) => updateEventConfiguration(eventId, payload)),
       updateEventStatus: (status) =>
         runAction((eventId) => updateEventStatus(eventId, status)),
       updateRegistrationStatus: (registrationId, status) =>

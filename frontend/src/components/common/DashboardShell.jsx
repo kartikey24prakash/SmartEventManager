@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 const THEMES = {
   admin: {
     badge: "bg-blue-100 text-blue-700",
@@ -47,13 +49,19 @@ export default function DashboardShell({
   headerBadge,
 }) {
   const theme = THEMES[role] || THEMES.admin;
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(241,245,249,0.88)_45%,_rgba(226,232,240,0.92)_100%)] text-slate-900">
       <div className={`pointer-events-none fixed inset-0 bg-gradient-to-br ${theme.halo}`} />
 
       <div className="relative flex min-h-screen">
-        <aside className="hidden w-80 shrink-0 border-r border-white/60 bg-white/75 px-5 py-6 backdrop-blur-xl xl:block">
+        {/* Sidebar */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 w-80 shrink-0 border-r border-white/60 bg-white/75 px-5 py-6 backdrop-blur-xl transition-transform duration-300 ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
           <div className="mb-8 flex items-center gap-4 px-2">
             <div
               className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${theme.logo} text-sm font-black text-white shadow-lg`}
@@ -117,41 +125,70 @@ export default function DashboardShell({
           </div>
         </aside>
 
-        <main className="flex-1">
-          <div className="border-b border-white/70 bg-white/70 px-5 py-5 shadow-sm backdrop-blur-xl sm:px-6 lg:px-8">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] ${theme.badge}`}>
-                    {roleLabel}
-                  </span>
-                  {headerBadge ? (
-                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${theme.accentBgSoft}`}>
-                      {headerBadge}
-                    </span>
-                  ) : null}
-                </div>
-                <h1 className="mt-4 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
-                  {title}
-                </h1>
-                {subtitle ? <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p> : null}
-              </div>
+        {/* Overlay for mobile */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm xl:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-              <div className="flex flex-wrap gap-2">
-                {navItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => onSelect(item.id)}
-                    className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
-                      activeId === item.id
-                        ? `${theme.accentBg} text-white`
-                        : `border border-white/80 bg-white/80 text-slate-600 ${theme.accentBorder}`
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+        {/* Main content - now adjusts based on sidebar state */}
+        <main 
+          className={`flex-1 transition-all duration-300 ${
+            sidebarOpen ? "ml-80" : "ml-0"
+          }`}
+        >
+          <div className="border-b border-white/70 bg-white/70 px-5 py-5 shadow-sm backdrop-blur-xl sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-5">
+              <div className="flex items-start justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex items-center gap-3">
+                    {/* Hamburger Menu Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSidebarOpen(!sidebarOpen)}
+                      className={`rounded-xl border border-white/80 bg-white/80 p-2.5 text-slate-600 transition ${theme.accentBorder}`}
+                      aria-label="Toggle sidebar"
+                    >
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        {sidebarOpen ? (
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        ) : (
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 6h16M4 12h16M4 18h16"
+                          />
+                        )}
+                      </svg>
+                    </button>
+
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] ${theme.badge}`}>
+                      {roleLabel}
+                    </span>
+                    {headerBadge ? (
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${theme.accentBgSoft}`}>
+                        {headerBadge}
+                      </span>
+                    ) : null}
+                  </div>
+                  <h1 className="mt-4 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
+                    {title}
+                  </h1>
+                  {subtitle ? <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p> : null}
+                </div>
               </div>
             </div>
 
