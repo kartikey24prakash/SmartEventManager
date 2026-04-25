@@ -8,6 +8,7 @@ import EventStats from "../components/coordinator/EventStats";
 import ParticipantList from "../components/coordinator/ParticipantList";
 import TeamList from "../components/coordinator/TeamList";
 import WinnerSelection from "../components/coordinator/WinnerSelection";
+import DashboardShell from "../components/common/DashboardShell";
 import useAuth from "../hooks/useAuth";
 import useCoordinatorData from "../hooks/useCoordinatorData";
 
@@ -291,86 +292,21 @@ export default function CoordinatorDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white px-4 py-6 lg:block">
-        <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-black text-white">
-            SEM
-          </div>
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.3em] text-violet-700">
-              SMART
-            </div>
-            <div className="text-xs text-slate-400">Coordinator Panel</div>
-          </div>
-        </div>
-
-        <nav className="space-y-1">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActiveView(item.id)}
-              className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
-                activeView === item.id
-                  ? "bg-violet-600 text-white shadow-lg shadow-violet-200"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-400">Signed in as</div>
-          <div className="mt-2 font-semibold text-slate-900">{user?.name}</div>
-          <div className="text-sm text-slate-500">{user?.email}</div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-violet-300 hover:text-violet-700"
-          >
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-1">
-        <div className="border-b border-slate-200 bg-white px-5 py-4 shadow-sm sm:px-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Coordinator</div>
-              <div className="text-xl font-bold text-slate-900">
-                {selectedEvent?.name || "Select an assigned event"}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {navItems.slice(0, 4).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveView(item.id)}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                    activeView === item.id
-                      ? "bg-violet-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-700"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {(error || authError) && (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-              {error || authError}
-            </div>
-          )}
-        </div>
-
-        <div className="px-5 py-6 sm:px-6">{renderView()}</div>
-      </main>
-    </div>
+    <DashboardShell
+      role="coordinator"
+      roleLabel="Coordinator"
+      roleCaption="Operations Workspace"
+      title={selectedEvent?.name || "Select an assigned event"}
+      subtitle="Run live event operations, attendance, winners, and certificates from one coordinated workspace."
+      navItems={navItems}
+      activeId={activeView}
+      onSelect={setActiveView}
+      user={user}
+      error={error || authError}
+      onLogout={handleLogout}
+      headerBadge={selectedEvent ? `Active event: ${selectedEvent.status}` : "No event selected"}
+    >
+      {renderView()}
+    </DashboardShell>
   );
 }

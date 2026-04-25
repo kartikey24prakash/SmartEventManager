@@ -7,6 +7,7 @@ import CoordinatorManagement from "../components/admin/CoordinatorManagement";
 import EventAnalytics from "../components/admin/EventAnalytics";
 import EventForm from "../components/admin/EventForm";
 import EventList from "../components/admin/EventList";
+import DashboardShell from "../components/common/DashboardShell";
 import { getCurrentUser, logoutUser } from "../services/authService";
 import { getCoordinators, createCoordinator } from "../services/adminService";
 import {
@@ -73,7 +74,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("events");
   const [showEventForm, setShowEventForm] = useState(false);
   const [editEvent, setEditEvent] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [events, setEvents] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
@@ -292,124 +292,24 @@ export default function AdminDashboard() {
   const currentNav = NAV.find((item) => item.id === activeTab);
 
   return (
-    <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
-      <aside
-        className={`${sidebarOpen ? "w-60" : "w-16"} shrink-0 bg-white border-r border-slate-200 flex flex-col transition-all duration-300 shadow-sm`}
-      >
-        <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-linear-30-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-200 shrink-0">
-            <span className="text-white text-xs font-bold">SEM</span>
-          </div>
-          {sidebarOpen && (
-            <div className="overflow-hidden">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-widest leading-tight">
-                SMART
-              </p>
-              <p className="text-xs text-slate-400 leading-tight">Event Manager</p>
-            </div>
-          )}
-        </div>
-
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setShowEventForm(false);
-              }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
-                activeTab === item.id
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-              }`}
-            >
-              <span className="text-base shrink-0">{item.label.slice(0, 1)}</span>
-              {sidebarOpen && (
-                <div className="overflow-hidden">
-                  <p className="text-sm font-semibold leading-tight">{item.label}</p>
-                  <p
-                    className={`text-xs leading-tight ${
-                      activeTab === item.id ? "text-blue-200" : "text-slate-400"
-                    }`}
-                  >
-                    {item.sub}
-                  </p>
-                </div>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-3 border-t border-slate-100">
-          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
-            <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              {currentUser?.name?.slice(0, 2).toUpperCase() || "AD"}
-            </div>
-            {sidebarOpen && (
-              <div className="overflow-hidden">
-                <p className="text-xs font-semibold text-slate-700">
-                  {currentUser?.name || "Admin"}
-                </p>
-                <p className="text-xs text-slate-400 truncate">
-                  {currentUser?.email || "admin"}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </aside>
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSidebarOpen((prev) => !prev)}
-              className="text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-            <div>
-              <h1 className="text-slate-800 font-bold text-base">
-                {currentNav?.label}
-              </h1>
-              <p className="text-slate-400 text-xs">{currentNav?.sub}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded-full">
-              Admin
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-6">
-          {error && (
-            <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-500 text-sm">
-              {error}
-            </div>
-          )}
-          {renderContent()}
-        </main>
-      </div>
-    </div>
+    <DashboardShell
+      role="admin"
+      roleLabel="Admin"
+      roleCaption="System Control Center"
+      title={currentNav?.label || "Admin Dashboard"}
+      subtitle={currentNav?.sub || "Manage events, coordinators, and reporting across the platform."}
+      navItems={NAV}
+      activeId={activeTab}
+      onSelect={(id) => {
+        setActiveTab(id);
+        setShowEventForm(false);
+      }}
+      user={currentUser}
+      error={error}
+      onLogout={handleLogout}
+      headerBadge={`${events.length} active records`}
+    >
+      {renderContent()}
+    </DashboardShell>
   );
 }
