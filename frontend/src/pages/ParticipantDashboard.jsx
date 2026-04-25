@@ -1,1055 +1,976 @@
-import React, { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 
-// --- Mock Data ---
-const mockUser = {
-  _id: "u1",
-  name: "Arjun Sharma",
-  email: "arjun@sms.ac.in",
-  institution: "SMS Varanasi",
-};
+import useAuth from "../hooks/useAuth";
+import {
+  createTeam,
+  getAvailableEvents,
+  getCertificateDownloadUrl,
+  getMyCertificates,
+  getMyRegistrations,
+  getMyTeams,
+  registerForEvent,
+  searchParticipants,
+  withdrawRegistration,
+  withdrawTeam,
+} from "../services/participantService";
 
-const initialAvailableEvents = [
-  {
-    _id: "evt001",
-    name: "National Hackathon 2026",
-    eventType: "technical",
-    date: "2026-05-15",
-    venue: "Tech Auditorium",
-    participationType: "team",
-    capacity: 200,
-    registered: 143,
-    status: "open",
-    icon: "⚡",
-  },
-  {
-    _id: "evt002",
-    name: "Cultural Fiesta",
-    eventType: "cultural",
-    date: "2026-04-25",
-    venue: "Main Stage",
-    participationType: "individual",
-    capacity: 300,
-    registered: 298,
-    status: "open",
-    icon: "🎭",
-  },
-  {
-    _id: "evt003",
-    name: "Business Plan Competition",
-    eventType: "academic",
-    date: "2026-06-10",
-    venue: "Seminar Hall 2",
-    participationType: "team",
-    capacity: 100,
-    registered: 45,
-    status: "open",
-    icon: "📚",
-  },
-  {
-    _id: "evt004",
-    name: "Athletics Meet 2026",
-    eventType: "sports",
-    date: "2026-06-20",
-    venue: "Sports Ground",
-    participationType: "individual",
-    capacity: 150,
-    registered: 150,
-    status: "closed",
-    icon: "🏆",
-  },
-];
+const formatDate = (value, fallback = "TBD") => {
+  if (!value) {
+    return fallback;
+  }
 
-const initialMyEvents = [
-  {
-    _id: "reg1",
-    eventId: "evt001",
-    eventName: "National Hackathon 2026",
-    date: "2026-05-15",
-    status: "participated",
-    participationType: "team",
-    teamName: "ByteForce",
-  },
-  {
-    _id: "reg2",
-    eventId: "evt002",
-    eventName: "Cultural Fiesta",
-    date: "2026-04-25",
-    status: "registered",
-    participationType: "individual",
-  },
-];
-
-const initialCertificates = [
-  {
-    _id: "cert1",
-    eventId: "evt001",
-    eventName: "National Hackathon 2026",
-    type: "participation",
-    date: "2026-05-16",
-    certNumber: "CERT-NAT-U1-001",
-  },
-  {
-    _id: "cert2",
-    eventId: "evt001",
-    eventName: "National Hackathon 2026",
-    type: "achievement",
-    rank: 1,
-    date: "2026-05-16",
-    certNumber: "CERT-NAT-U1-002",
-  },
-];
-
-// --- Utilities ---
-const STATUS_CONFIG = {
-  registered: {
-    label: "Registered",
-    color: "#3b82f6",
-    bg: "rgba(59,130,246,0.12)",
-  },
-  participated: {
-    label: "Participated",
-    color: "#16a34a",
-    bg: "rgba(22,163,74,0.12)",
-  },
-  withdrawn: {
-    label: "Withdrawn",
-    color: "#dc2626",
-    bg: "rgba(220,38,38,0.12)",
-  },
-  open: { label: "Open", color: "#16a34a", bg: "rgba(22,163,74,0.12)" },
-  closed: { label: "Closed", color: "#dc2626", bg: "rgba(220,38,38,0.12)" },
-};
-
-const RANK_MAP = {
-  1: { icon: "🥇", label: "1st Place" },
-  2: { icon: "🥈", label: "2nd Place" },
-  3: { icon: "🥉", label: "3rd Place" },
-};
-
-// ==========================================
-// COMPONENT 1: Certificate Preview
-// ==========================================
-const CertPreview = ({
-  type,
-  participantName,
-  eventName,
-  rank,
-  certNumber,
-}) => (
-  <div style={certStyles.preview}>
-    <div
-      style={{
-        ...certStyles.previewInner,
-        ...(type === "achievement"
-          ? certStyles.achievementBg
-          : certStyles.participationBg),
-      }}
-    >
-      <div style={certStyles.watermark}>
-        {type === "achievement" ? "🏆" : "📜"}
-      </div>
-      <div style={certStyles.certTop}>
-        CERTIFICATE OF{" "}
-        {type === "achievement" ? "ACHIEVEMENT" : "PARTICIPATION"}
-      </div>
-      <div style={certStyles.certBody}>
-        <div style={certStyles.certLine}>This is to certify that</div>
-        <div style={certStyles.certName}>{participantName}</div>
-        <div style={certStyles.certLine}>
-          has successfully {type === "achievement" ? "won" : "participated in"}
-        </div>
-        <div style={certStyles.certEvent}>{eventName}</div>
-        {type === "achievement" && rank && (
-          <div style={certStyles.certRank}>
-            {RANK_MAP[rank]?.icon} {RANK_MAP[rank]?.label}
-          </div>
-        )}
-      </div>
-      <div style={certStyles.certFooter}>
-        <div style={certStyles.certSig}>Authorized Signature</div>
-        <div>
-          <div style={certStyles.certDate}>
-            {new Date().toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </div>
-          <div style={{ fontSize: 8, color: "#94a3b8", marginTop: 4 }}>
-            ID: {certNumber}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// ==========================================
-// COMPONENT 2: Event Browser
-// ==========================================
-const EventBrowser = ({ events, userRegistrations, onEnroll }) => {
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
-
-  const filteredEvents = events.filter((e) => {
-    const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === "all" || e.eventType === filter;
-    return matchesSearch && matchesFilter;
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
-
-  return (
-    <div>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>Browse Events</h2>
-          <p style={styles.sectionSub}>
-            Discover and participate in upcoming events.
-          </p>
-        </div>
-      </div>
-
-      <div style={styles.filterBar}>
-        <div style={styles.searchWrap}>
-          <span style={styles.searchIcon}>🔍</span>
-          <input
-            style={styles.searchInput}
-            placeholder="Search events..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div style={styles.filterGroup}>
-          {["all", "technical", "cultural", "academic", "sports"].map((f) => (
-            <button
-              key={f}
-              style={{
-                ...styles.filterBtn,
-                ...(filter === f ? styles.filterBtnActive : {}),
-              }}
-              onClick={() => setFilter(f)}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={styles.grid}>
-        {filteredEvents.map((event) => {
-          const isEnrolled = userRegistrations.some(
-            (r) => r.eventId === event._id && r.status !== "withdrawn",
-          );
-          const isFull = event.registered >= event.capacity;
-          const sc = STATUS_CONFIG[isFull ? "closed" : event.status];
-
-          return (
-            <div key={event._id} style={styles.card} className="hover-card">
-              <div style={styles.cardTop}>
-                <span style={{ fontSize: 24 }}>{event.icon}</span>
-                <span
-                  style={{
-                    ...styles.statusPill,
-                    color: sc.color,
-                    background: sc.bg,
-                  }}
-                >
-                  {isFull ? "Full" : sc.label}
-                </span>
-              </div>
-              <h3 style={styles.cardTitle}>{event.name}</h3>
-              <div style={styles.meta}>
-                <span style={styles.metaItem}>
-                  📅{" "}
-                  {new Date(event.date).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                  })}
-                </span>
-                <span style={styles.metaItem}>📍 {event.venue}</span>
-                <span style={styles.metaItem}>
-                  {event.participationType === "team"
-                    ? "👥 Team Event"
-                    : "👤 Individual"}
-                </span>
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                {isEnrolled ? (
-                  <button
-                    style={{
-                      ...styles.actionBtn,
-                      background: "#f1f5f9",
-                      color: "#64748b",
-                      border: "1px solid #e2e8f0",
-                    }}
-                    disabled
-                  >
-                    ✓ Already Enrolled
-                  </button>
-                ) : isFull ? (
-                  <button
-                    style={{
-                      ...styles.actionBtn,
-                      background: "#fee2e2",
-                      color: "#dc2626",
-                      border: "1px solid #fca5a5",
-                    }}
-                    disabled
-                  >
-                    Event Full
-                  </button>
-                ) : (
-                  <button
-                    style={styles.actionBtn}
-                    className="primary-btn"
-                    onClick={() => onEnroll(event)}
-                  >
-                    Enroll Now →
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 };
 
-// ==========================================
-// COMPONENT 3: My Events (Registrations)
-// ==========================================
-const MyEvents = ({ registrations, onWithdraw }) => {
-  if (registrations.length === 0) {
-    return (
-      <div style={styles.emptyState}>
-        <span style={{ fontSize: 40 }}>📭</span>
-        <h3>No active registrations</h3>
-        <p>You haven't enrolled in any events yet.</p>
-      </div>
-    );
+const formatCertificateType = (value) => {
+  if (value === "achievement") {
+    return "Achievement";
   }
 
-  return (
-    <div>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>My Registrations</h2>
-          <p style={styles.sectionSub}>
-            Track and manage your event participation.
-          </p>
-        </div>
-      </div>
-
-      <div style={styles.listContainer}>
-        {registrations.map((reg) => {
-          const sc = STATUS_CONFIG[reg.status];
-          return (
-            <div
-              key={reg._id}
-              style={styles.listItem}
-              className="hover-list-item"
-            >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 4,
-                  }}
-                >
-                  <h3 style={{ margin: 0, fontSize: 16, color: "#0f172a" }}>
-                    {reg.eventName}
-                  </h3>
-                  <span
-                    style={{
-                      ...styles.statusPill,
-                      color: sc.color,
-                      background: sc.bg,
-                    }}
-                  >
-                    {sc.label}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    fontSize: 13,
-                    color: "#64748b",
-                  }}
-                >
-                  <span>
-                    📅{" "}
-                    {new Date(reg.date).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                  <span>
-                    {reg.participationType === "team"
-                      ? `👥 Team: ${reg.teamName}`
-                      : "👤 Individual"}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 10 }}>
-                {reg.participationType === "team" &&
-                  reg.status !== "withdrawn" && (
-                    <button style={styles.outlineBtn} className="hover-outline">
-                      Manage Team
-                    </button>
-                  )}
-                {reg.status === "registered" && (
-                  <button
-                    style={{
-                      ...styles.outlineBtn,
-                      color: "#dc2626",
-                      borderColor: "#fca5a5",
-                    }}
-                    className="hover-danger"
-                    onClick={() => onWithdraw(reg._id)}
-                  >
-                    Withdraw
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// COMPONENT 4: My Certificates
-// ==========================================
-const MyCertificates = ({ certificates, user }) => {
-  if (certificates.length === 0) {
-    return (
-      <div style={styles.emptyState}>
-        <span style={{ fontSize: 40 }}>🎓</span>
-        <h3>No certificates yet</h3>
-        <p>Participate in events to earn certificates.</p>
-      </div>
-    );
+  if (value === "winner") {
+    return "Winner";
   }
 
-  return (
-    <div>
-      <div style={styles.sectionHeader}>
-        <div>
-          <h2 style={styles.sectionTitle}>My Certificates</h2>
-          <p style={styles.sectionSub}>View and download your achievements.</p>
-        </div>
-      </div>
-
-      <div style={styles.grid}>
-        {certificates.map((cert) => (
-          <div key={cert._id} style={styles.card} className="hover-card">
-            <CertPreview
-              type={cert.type}
-              participantName={user.name}
-              eventName={cert.eventName}
-              rank={cert.rank}
-              certNumber={cert.certNumber}
-            />
-            <button
-              style={{ ...styles.actionBtn, marginTop: 12 }}
-              className="primary-btn"
-            >
-              ⬇ Download PDF
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return "Participation";
 };
 
-// ==========================================
-// MAIN COMPONENT: Participant Dashboard
-// ==========================================
-export default function ParticipantDashboard() {
-  const [activeView, setActiveView] = useState("dashboard");
-  const [user] = useState(mockUser);
-  const [events] = useState(initialAvailableEvents);
-  const [registrations, setRegistrations] = useState(initialMyEvents);
-  const [certificates] = useState(initialCertificates);
+const statusStyles = {
+  registered: "bg-blue-50 text-blue-700 border-blue-200",
+  participated: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  withdrawn: "bg-rose-50 text-rose-700 border-rose-200",
+  absent: "bg-amber-50 text-amber-700 border-amber-200",
+  open: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  ongoing: "bg-violet-50 text-violet-700 border-violet-200",
+  completed: "bg-slate-100 text-slate-600 border-slate-200",
+  draft: "bg-slate-100 text-slate-500 border-slate-200",
+  cancelled: "bg-rose-50 text-rose-700 border-rose-200",
+};
 
-  // --- Handlers ---
-  const handleEnroll = (event) => {
-    // Mock enroll logic
-    const newReg = {
-      _id: `reg${Date.now()}`,
-      eventId: event._id,
-      eventName: event.name,
-      date: event.date,
-      status: "registered",
-      participationType: event.participationType,
-      teamName:
-        event.participationType === "team" ? `${user.name}'s Team` : null,
-    };
-    setRegistrations([newReg, ...registrations]);
-    setActiveView("my-events");
+function TeamModal({
+  event,
+  onClose,
+  onCreate,
+  searching,
+  searchResults,
+  onSearch,
+  creating,
+}) {
+  const [teamName, setTeamName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [error, setError] = useState("");
+
+  if (!event) {
+    return null;
+  }
+
+  const addMember = (user) => {
+    setSelectedMembers((current) => {
+      if (current.some((member) => member._id === user._id)) {
+        return current;
+      }
+
+      return [...current, user];
+    });
+    setStudentId("");
+    setError("");
   };
 
-  const handleWithdraw = (regId) => {
-    // Mock withdraw logic
-    setRegistrations(
-      registrations.map((r) =>
-        r._id === regId ? { ...r, status: "withdrawn" } : r,
-      ),
-    );
+  const removeMember = (memberId) => {
+    setSelectedMembers((current) => current.filter((member) => member._id !== memberId));
   };
 
-  // --- Dashboard Overview Content ---
-  const renderDashboardOverview = () => {
-    const activeRegs = registrations.filter(
-      (r) => r.status === "registered" || r.status === "participated",
-    ).length;
-    const certCount = certificates.length;
+  const handleSearch = async (e) => {
+    e.preventDefault();
 
-    return (
-      <div>
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={styles.title}>Welcome back, {user.name} 👋</h1>
-          <p style={styles.subtitle}>{user.institution} • Participant</p>
-        </div>
+    if (!studentId.trim()) {
+      setError("Enter a student ID to search teammates.");
+      return;
+    }
 
-        <div style={styles.statsGrid}>
-          <div style={styles.statCard}>
-            <div style={styles.statTop}>
-              <div
-                style={{
-                  ...styles.statIconWrap,
-                  color: "#3b82f6",
-                  background: "rgba(59,130,246,0.1)",
-                }}
-              >
-                📅
-              </div>
-            </div>
-            <div style={styles.statValue}>{activeRegs}</div>
-            <div style={styles.statLabel}>Active Enrollments</div>
-          </div>
-
-          <div style={styles.statCard}>
-            <div style={styles.statTop}>
-              <div
-                style={{
-                  ...styles.statIconWrap,
-                  color: "#16a34a",
-                  background: "rgba(22,163,74,0.1)",
-                }}
-              >
-                ✅
-              </div>
-            </div>
-            <div style={styles.statValue}>
-              {registrations.filter((r) => r.status === "participated").length}
-            </div>
-            <div style={styles.statLabel}>Events Attended</div>
-          </div>
-
-          <div style={styles.statCard}>
-            <div style={styles.statTop}>
-              <div
-                style={{
-                  ...styles.statIconWrap,
-                  color: "#7c3aed",
-                  background: "rgba(124, 58, 237, 0.1)",
-                }}
-              >
-                🎓
-              </div>
-            </div>
-            <div style={styles.statValue}>{certCount}</div>
-            <div style={styles.statLabel}>Certificates Earned</div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: 24,
-          }}
-        >
-          {/* Quick Actions Card */}
-          <div style={styles.card}>
-            <h3 style={{ margin: "0 0 16px", color: "#0f172a" }}>
-              Quick Actions
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button
-                style={{
-                  ...styles.actionBtn,
-                  background: "rgba(124, 58, 237, 0.05)",
-                  color: "#7c3aed",
-                  border: "1px solid rgba(124, 58, 237, 0.2)",
-                }}
-                onClick={() => setActiveView("browse")}
-                className="hover-bg-purple"
-              >
-                🔍 Browse New Events
-              </button>
-              <button
-                style={{
-                  ...styles.actionBtn,
-                  background: "rgba(59,130,246,0.05)",
-                  color: "#3b82f6",
-                  border: "1px solid rgba(59,130,246,0.2)",
-                }}
-                onClick={() => setActiveView("my-events")}
-              >
-                📋 View My Registrations
-              </button>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div style={styles.card}>
-            <h3 style={{ margin: "0 0 16px", color: "#0f172a" }}>
-              Recent Activity
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {registrations.slice(0, 3).map((r) => (
-                <div
-                  key={r._id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    fontSize: 13,
-                    color: "#334155",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: STATUS_CONFIG[r.status].color,
-                    }}
-                  />
-                  <span style={{ flex: 1 }}>{r.eventName}</span>
-                  <span style={{ color: "#64748b" }}>
-                    {STATUS_CONFIG[r.status].label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    setError("");
+    await onSearch(studentId.trim(), event._id);
   };
 
-  // --- Main Render Switch ---
-  const renderView = () => {
-    switch (activeView) {
-      case "browse":
-        return (
-          <EventBrowser
-            events={events}
-            userRegistrations={registrations}
-            onEnroll={handleEnroll}
-          />
-        );
-      case "my-events":
-        return (
-          <MyEvents registrations={registrations} onWithdraw={handleWithdraw} />
-        );
-      case "certificates":
-        return <MyCertificates certificates={certificates} user={user} />;
-      case "dashboard":
-      default:
-        return renderDashboardOverview();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!teamName.trim()) {
+      setError("Team name is required.");
+      return;
+    }
+
+    setError("");
+
+    try {
+      await onCreate({
+        eventId: event._id,
+        teamName: teamName.trim(),
+        members: selectedMembers.map((member) => member._id),
+      });
+    } catch (submitError) {
+      setError(submitError.message);
     }
   };
 
   return (
-    <div style={styles.appContainer}>
-      <style>{css}</style>
-
-      {/* Sidebar Navigation */}
-      <nav style={styles.sidebar}>
-        <div style={styles.sidebarLogo}>
-          <span style={{ fontSize: 24 }}>🎓</span>
-          <span style={{ fontWeight: 800, color: "#0f172a", fontSize: 18 }}>
-            Student Portal
-          </span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+      <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.3em] text-violet-600">
+              Team Enrollment
+            </div>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">{event.name}</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Build your team and submit it for this event.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+          >
+            Close
+          </button>
         </div>
 
-        <div style={styles.navGroup}>
-          <div style={styles.navLabel}>MENU</div>
-          {[
-            { id: "dashboard", icon: "🏠", label: "Dashboard" },
-            { id: "browse", icon: "🔍", label: "Browse Events" },
-            { id: "my-events", icon: "📋", label: "My Registrations" },
-            { id: "certificates", icon: "🏆", label: "My Certificates" },
-          ].map((nav) => (
+        {error ? (
+          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+            {error}
+          </div>
+        ) : null}
+
+        <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-5">
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">
+                Team Name
+              </label>
+              <input
+                type="text"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="Enter a team name"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-300 focus:bg-white"
+              />
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Add teammates</div>
+                  <div className="text-xs text-slate-500">
+                    Search by student ID. You are included automatically as team leader.
+                  </div>
+                </div>
+                <div className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
+                  {selectedMembers.length + 1} members total
+                </div>
+              </div>
+
+              <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <input
+                  type="text"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                  placeholder="Search student ID"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-300"
+                />
+                <button
+                  type="button"
+                  onClick={handleSearch}
+                  disabled={searching}
+                  className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {searching ? "Searching..." : "Search"}
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {searchResults.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-400">
+                    Search results will appear here.
+                  </div>
+                ) : (
+                  searchResults.map((user) => {
+                    const alreadyAdded = selectedMembers.some((member) => member._id === user._id);
+
+                    return (
+                      <div
+                        key={user._id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-900">{user.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {user.studentId} - {user.institution || "Institution not set"}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => addMember(user)}
+                          disabled={alreadyAdded}
+                          className="rounded-xl border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                        >
+                          {alreadyAdded ? "Added" : "Add"}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <div className="text-sm font-bold text-slate-900">Selected team</div>
+              <div className="text-xs text-slate-500">
+                Event rule: {event.teamConfig?.minTeamSize || 1} to{" "}
+                {event.teamConfig?.maxTeamSize || 1} members
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                  Leader
+                </div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">You</div>
+              </div>
+
+              {selectedMembers.map((member) => (
+                <div
+                  key={member._id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3"
+                >
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{member.name}</div>
+                    <div className="text-xs text-slate-500">{member.studentId}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeMember(member._id)}
+                    className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+
             <button
-              key={nav.id}
-              style={{
-                ...styles.navItem,
-                ...(activeView === nav.id ? styles.navItemActive : {}),
-              }}
-              onClick={() => setActiveView(nav.id)}
+              type="submit"
+              disabled={creating}
+              className="mt-5 w-full rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              <span>{nav.icon}</span> {nav.label}
+              {creating ? "Creating team..." : "Create Team"}
             </button>
-          ))}
-        </div>
-      </nav>
-
-      {/* Main Content Area */}
-      <main style={styles.mainContentArea}>
-        <div style={styles.contentWrapper}>{renderView()}</div>
-      </main>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
-// ==========================================
-// STYLES
-// ==========================================
-const styles = {
-  appContainer: {
-    display: "flex",
-    minHeight: "100vh",
-    background: "#f8fafc",
-    fontFamily: "'Syne', 'Segoe UI', sans-serif",
-    color: "#334155",
-  },
-  sidebar: {
-    width: "250px",
-    background: "#ffffff",
-    borderRight: "1px solid #e2e8f0",
-    padding: "24px 16px",
-    display: "flex",
-    flexDirection: "column",
-    flexShrink: 0,
-  },
-  sidebarLogo: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 40,
-    padding: "0 10px",
-  },
-  navGroup: { marginBottom: 30 },
-  navLabel: {
-    fontSize: 11,
-    color: "#64748b",
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    marginBottom: 12,
-    padding: "0 10px",
-  },
-  navItem: {
-    width: "100%",
-    background: "transparent",
-    border: "none",
-    padding: "12px 14px",
-    borderRadius: 8,
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    color: "#475569",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "all 0.2s",
-    textAlign: "left",
-    marginBottom: 4,
-  },
-  navItemActive: {
-    background: "rgba(124, 58, 237, 0.1)",
-    color: "#7c3aed",
-  },
-  mainContentArea: {
-    flex: 1,
-    overflowY: "auto",
-    height: "100vh",
-  },
-  contentWrapper: {
-    padding: "40px",
-    maxWidth: "1100px",
-    margin: "0 auto",
-  },
-  title: {
-    margin: 0,
-    fontSize: 28,
-    fontWeight: 700,
-    color: "#0f172a",
-    letterSpacing: "-0.5px",
-  },
-  subtitle: { margin: "6px 0 0", fontSize: 15, color: "#64748b" },
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: 24,
-  },
-  sectionTitle: { margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a" },
-  sectionSub: { margin: "4px 0 0", fontSize: 14, color: "#64748b" },
-  statsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: 20,
-    marginBottom: 32,
-  },
-  statCard: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: 20,
-  },
-  statTop: { marginBottom: 12 },
-  statIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 20,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 800,
-    color: "#0f172a",
-    marginBottom: 4,
-  },
-  statLabel: { fontSize: 13, color: "#64748b", fontWeight: 600 },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-    gap: 24,
-  },
-  card: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: 24,
-    transition: "all 0.2s",
-  },
-  cardTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  statusPill: {
-    fontSize: 11,
-    fontWeight: 600,
-    padding: "4px 10px",
-    borderRadius: 20,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-  },
-  cardTitle: {
-    margin: "0 0 12px",
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#0f172a",
-  },
-  meta: { display: "flex", flexDirection: "column", gap: 6 },
-  metaItem: { fontSize: 13, color: "#64748b" },
-  actionBtn: {
-    width: "100%",
-    padding: "12px",
-    borderRadius: 8,
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: "pointer",
-    transition: "all 0.2s",
-    border: "none",
-  },
-  filterBar: { display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" },
-  searchWrap: { position: "relative", flex: 1, minWidth: 250 },
-  searchIcon: {
-    position: "absolute",
-    left: 14,
-    top: "50%",
-    transform: "translateY(-50%)",
-    fontSize: 14,
-  },
-  searchInput: {
-    width: "100%",
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 8,
-    padding: "11px 14px 11px 38px",
-    color: "#334155",
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box",
-  },
-  filterGroup: { display: "flex", gap: 8, flexWrap: "wrap" },
-  filterBtn: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 8,
-    padding: "8px 16px",
-    color: "#64748b",
-    fontSize: 13,
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  filterBtnActive: {
-    background: "rgba(124, 58, 237, 0.08)",
-    border: "1px solid rgba(124, 58, 237, 0.3)",
-    color: "#7c3aed",
-    fontWeight: 600,
-  },
-  listContainer: { display: "flex", flexDirection: "column", gap: 12 },
-  listItem: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 12,
-    padding: "16px 20px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 16,
-    transition: "all 0.2s",
-  },
-  outlineBtn: {
-    background: "transparent",
-    border: "1px solid #cbd5e1",
-    borderRadius: 6,
-    padding: "8px 16px",
-    color: "#475569",
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  emptyState: {
-    textAlign: "center",
-    padding: "60px 20px",
-    background: "#ffffff",
-    border: "1px dashed #cbd5e1",
-    borderRadius: 14,
-    color: "#64748b",
-  },
-};
+export default function ParticipantDashboard() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading, error: authError, signOut } = useAuth("participant");
+  const [activeView, setActiveView] = useState("dashboard");
+  const [events, setEvents] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [certificates, setCertificates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [teamModalEvent, setTeamModalEvent] = useState(null);
+  const [teamSearchLoading, setTeamSearchLoading] = useState(false);
+  const [teamSearchResults, setTeamSearchResults] = useState([]);
 
-const certStyles = {
-  preview: { width: "100%" },
-  previewInner: {
-    borderRadius: 8,
-    padding: "24px",
-    position: "relative",
-    overflow: "hidden",
-    minHeight: 220,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    border: "2px solid",
-  },
-  participationBg: {
-    background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
-    borderColor: "#e2e8f0",
-  },
-  achievementBg: {
-    background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
-    borderColor: "#fde68a",
-  },
-  watermark: {
-    position: "absolute",
-    right: 16,
-    top: 16,
-    fontSize: 48,
-    opacity: 0.08,
-  },
-  certTop: {
-    fontSize: 9,
-    letterSpacing: "0.15em",
-    color: "#64748b",
-    textTransform: "uppercase",
-    marginBottom: 12,
-  },
-  certBody: {
-    textAlign: "center",
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 4,
-  },
-  certLine: { fontSize: 11, color: "#64748b" },
-  certName: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#0f172a",
-    letterSpacing: "-0.5px",
-    margin: "4px 0",
-  },
-  certEvent: { fontSize: 13, fontWeight: 600, color: "#7c3aed" },
-  certRank: { fontSize: 14, fontWeight: 700, color: "#d97706", marginTop: 4 },
-  certFooter: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 16,
-    paddingTop: 10,
-    borderTop: "1px solid #e2e8f0",
-  },
-  certSig: { fontSize: 10, color: "#94a3b8", fontStyle: "italic" },
-  certDate: { fontSize: 10, color: "#94a3b8", textAlign: "right" },
-};
+  const loadParticipantData = async () => {
+    setLoading(true);
+    setError("");
 
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap');
-  
-  .primary-btn {
-    background: #7c3aed !important;
-    color: #ffffff !important;
-  }
-  .primary-btn:hover:not(:disabled) {
-    background: #6d28d9 !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
-  }
-  .hover-card:hover {
-    border-color: #7c3aed44 !important;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
-    transform: translateY(-2px);
-  }
-  .hover-list-item:hover {
-    border-color: #7c3aed44 !important;
-    background: #f8fafc !important;
-  }
-  .hover-outline:hover {
-    border-color: #7c3aed88 !important;
-    color: #7c3aed !important;
-    background: rgba(124, 58, 237, 0.05) !important;
-  }
-  .hover-danger:hover {
-    background: #fee2e2 !important;
-  }
-  .hover-bg-purple:hover {
-    background: rgba(124, 58, 237, 0.1) !important;
-  }
-  .navItem:hover:not(.navItemActive) {
-    background: #f1f5f9 !important;
-  }
-  input:focus {
-    border-color: #7c3aed88 !important;
+    try {
+      const [eventsData, registrationsData, teamsData, certificatesData] = await Promise.all([
+        getAvailableEvents(),
+        getMyRegistrations(),
+        getMyTeams(),
+        getMyCertificates(),
+      ]);
+
+      setEvents(eventsData.events || []);
+      setRegistrations(registrationsData.registrations || []);
+      setTeams(teamsData.teams || []);
+      setCertificates(certificatesData.certificates || []);
+    } catch (loadError) {
+      setError(loadError.response?.data?.message || "Failed to load participant dashboard.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/login", { replace: true });
+    }
+  }, [authLoading, navigate, user]);
+
+  useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      loadParticipantData();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [user]);
+
+  const activeRegistrations = useMemo(
+    () => registrations.filter((registration) => registration.status !== "withdrawn"),
+    [registrations]
+  );
+
+  const activeTeams = useMemo(
+    () => teams.filter((team) => team.status !== "withdrawn"),
+    [teams]
+  );
+
+  const enrolledEventIds = useMemo(() => {
+    const ids = new Set();
+
+    activeRegistrations.forEach((registration) => {
+      ids.add(registration.eventId?._id || registration.eventId);
+    });
+
+    activeTeams.forEach((team) => {
+      ids.add(team.eventId?._id || team.eventId);
+    });
+
+    return ids;
+  }, [activeRegistrations, activeTeams]);
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      const isAvailable = ["open", "ongoing"].includes(event.status);
+      const matchesSearch = event.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = typeFilter === "all" || event.eventType === typeFilter;
+      return isAvailable && matchesSearch && matchesType;
+    });
+  }, [events, searchTerm, typeFilter]);
+
+  const myEntries = useMemo(() => {
+    const individualEntries = registrations.map((registration) => ({
+      id: registration._id,
+      kind: "individual",
+      eventId: registration.eventId?._id || registration.eventId,
+      eventName: registration.eventId?.name || "Event",
+      eventDate: registration.eventId?.eventDate,
+      venue: registration.eventId?.venue,
+      status: registration.status,
+      participationType: "individual",
+      createdAt: registration.createdAt,
+      isLeader: false,
+    }));
+
+    const teamEntries = teams.map((team) => ({
+      id: team._id,
+      kind: "team",
+      eventId: team.eventId?._id || team.eventId,
+      eventName: team.eventId?.name || "Event",
+      eventDate: team.eventId?.eventDate,
+      venue: team.eventId?.venue,
+      status: team.status,
+      participationType: "team",
+      teamName: team.teamName,
+      members: team.members,
+      createdAt: team.createdAt,
+      isLeader: team.leaderId?._id === user?._id,
+    }));
+
+    return [...individualEntries, ...teamEntries].sort(
+      (left, right) => new Date(right.createdAt) - new Date(left.createdAt)
+    );
+  }, [registrations, teams, user?._id]);
+
+  const stats = useMemo(() => {
+    const attendedIndividuals = registrations.filter(
+      (registration) => registration.status === "participated"
+    ).length;
+    const attendedTeams = teams.filter((team) => team.status === "participated").length;
+
+    return {
+      active: activeRegistrations.length + activeTeams.length,
+      attended: attendedIndividuals + attendedTeams,
+      certificates: certificates.length,
+    };
+  }, [activeRegistrations.length, activeTeams.length, certificates.length, registrations, teams]);
+
+  const handleRegister = async (event) => {
+    setActionLoading(true);
+    setError("");
+
+    try {
+      if (event.participationType === "team") {
+        setTeamSearchResults([]);
+        setTeamModalEvent(event);
+        return;
+      }
+
+      await registerForEvent(event._id);
+      await loadParticipantData();
+      setActiveView("my-events");
+    } catch (actionError) {
+      setError(actionError.response?.data?.message || "Unable to register for event.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleWithdrawRegistration = async (registrationId) => {
+    setActionLoading(true);
+    setError("");
+
+    try {
+      await withdrawRegistration(registrationId);
+      await loadParticipantData();
+    } catch (actionError) {
+      setError(actionError.response?.data?.message || "Unable to withdraw registration.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleWithdrawTeam = async (teamId) => {
+    setActionLoading(true);
+    setError("");
+
+    try {
+      await withdrawTeam(teamId);
+      await loadParticipantData();
+    } catch (actionError) {
+      setError(actionError.response?.data?.message || "Unable to withdraw team.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTeamSearch = async (studentId, eventId) => {
+    setTeamSearchLoading(true);
+
+    try {
+      const data = await searchParticipants(studentId, eventId);
+      setTeamSearchResults(data.users || []);
+    } catch (searchError) {
+      setError(searchError.response?.data?.message || "Unable to search participants.");
+      setTeamSearchResults([]);
+    } finally {
+      setTeamSearchLoading(false);
+    }
+  };
+
+  const handleCreateTeam = async (payload) => {
+    setActionLoading(true);
+    setError("");
+
+    try {
+      await createTeam(payload);
+      setTeamModalEvent(null);
+      setTeamSearchResults([]);
+      await loadParticipantData();
+      setActiveView("my-events");
+    } catch (actionError) {
+      const message = actionError.response?.data?.message || "Unable to create team.";
+      setError(message);
+      throw new Error(message, { cause: actionError });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
+  };
+
+  const renderDashboard = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <div className="text-xs font-black uppercase tracking-[0.3em] text-blue-600">
+            Participant Workspace
+          </div>
+          <h1 className="mt-2 text-3xl font-bold text-slate-900">
+            Welcome back, {user?.name}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Browse live events, manage registrations, and download your certificates.
+          </p>
+        </div>
+        <div className="rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-blue-600">Institution</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">
+            {user?.institution || "Not provided"}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {[
+          { label: "Active Enrollments", value: stats.active, tone: "from-blue-500 to-cyan-500" },
+          { label: "Events Attended", value: stats.attended, tone: "from-emerald-500 to-teal-500" },
+          { label: "Certificates", value: stats.certificates, tone: "from-violet-500 to-indigo-600" },
+        ].map((card) => (
+          <div
+            key={card.label}
+            className={`rounded-3xl bg-gradient-to-br ${card.tone} p-5 text-white shadow-lg`}
+          >
+            <div className="text-sm font-medium text-white/80">{card.label}</div>
+            <div className="mt-3 text-4xl font-black">{card.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-xl font-bold text-slate-900">Open Events</div>
+              <div className="text-sm text-slate-500">
+                Your next opportunities across technical, cultural, sports, and academic events.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveView("browse")}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
+            >
+              Browse all
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredEvents.slice(0, 4).map((event) => {
+              const eventId = event._id;
+              const enrolled = enrolledEventIds.has(eventId);
+
+              return (
+                <div key={eventId} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-bold text-slate-900">{event.name}</div>
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        statusStyles[event.status] || statusStyles.draft
+                      }`}
+                    >
+                      {event.status}
+                    </span>
+                  </div>
+                  <div className="mt-3 text-xs text-slate-500">
+                    {event.eventType} - {event.participationType} - {formatDate(event.eventDate)}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={actionLoading || enrolled}
+                    onClick={() => handleRegister(event)}
+                    className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {enrolled
+                      ? "Already Enrolled"
+                      : event.participationType === "team"
+                        ? "Create Team"
+                        : "Register"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 text-xl font-bold text-slate-900">Recent Activity</div>
+          <div className="space-y-3">
+            {myEntries.slice(0, 5).length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-400">
+                No registrations yet.
+              </div>
+            ) : (
+              myEntries.slice(0, 5).map((entry) => (
+                <div key={`${entry.kind}-${entry.id}`} className="rounded-2xl bg-slate-50 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-slate-900">{entry.eventName}</div>
+                      <div className="text-xs text-slate-500">
+                        {entry.kind === "team"
+                          ? `${entry.teamName} - ${entry.members?.length || 0} members`
+                          : "Individual registration"}
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        statusStyles[entry.status] || statusStyles.registered
+                      }`}
+                    >
+                      {entry.status}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderBrowse = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-2xl font-bold text-slate-900">Browse Events</div>
+          <div className="text-sm text-slate-500">
+            Search live events and enroll as an individual or a team.
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by event name"
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-300"
+          />
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-300"
+          >
+            <option value="all">All types</option>
+            <option value="technical">Technical</option>
+            <option value="cultural">Cultural</option>
+            <option value="sports">Sports</option>
+            <option value="academic">Academic</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        {filteredEvents.map((event) => {
+          const enrolled = enrolledEventIds.has(event._id);
+          const participantCount = event.stats?.totalParticipants || 0;
+
+          return (
+            <div key={event._id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    statusStyles[event.status] || statusStyles.draft
+                  }`}
+                >
+                  {event.status}
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  {event.eventType}
+                </span>
+              </div>
+
+              <div className="mt-4 text-xl font-bold text-slate-900">{event.name}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {event.description || "No description provided yet."}
+              </p>
+
+              <div className="mt-4 grid gap-2 text-sm text-slate-600">
+                <div>Date: {formatDate(event.eventDate)}</div>
+                <div>Venue: {event.venue || "TBD"}</div>
+                <div>Mode: {event.participationType}</div>
+                <div>Participants: {participantCount}</div>
+              </div>
+
+              {event.participationType === "team" ? (
+                <div className="mt-4 rounded-2xl bg-violet-50 px-4 py-3 text-xs text-violet-700">
+                  Team rule: {event.teamConfig?.minTeamSize || 1}-
+                  {event.teamConfig?.maxTeamSize || 1} members
+                  {event.teamConfig?.genderRequirement &&
+                  event.teamConfig.genderRequirement !== "none"
+                    ? ` - ${event.teamConfig.genderRequirement}`
+                    : ""}
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                disabled={actionLoading || enrolled}
+                onClick={() => handleRegister(event)}
+                className="mt-5 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {enrolled
+                  ? "Already Enrolled"
+                  : event.participationType === "team"
+                    ? "Create Team"
+                    : "Register Now"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderMyEvents = () => (
+    <div className="space-y-6">
+      <div>
+        <div className="text-2xl font-bold text-slate-900">My Registrations</div>
+        <div className="text-sm text-slate-500">
+          View your individual and team registrations in one place.
+        </div>
+      </div>
+
+      {myEntries.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-400">
+          No registrations yet. Browse events to get started.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {myEntries.map((entry) => (
+            <div
+              key={`${entry.kind}-${entry.id}`}
+              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="text-lg font-bold text-slate-900">{entry.eventName}</div>
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                        statusStyles[entry.status] || statusStyles.registered
+                      }`}
+                    >
+                      {entry.status}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                      {entry.participationType}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm text-slate-500">
+                    <div>Date: {formatDate(entry.eventDate)}</div>
+                    <div>Venue: {entry.venue || "TBD"}</div>
+                    {entry.kind === "team" ? (
+                      <div>
+                        Team: {entry.teamName} - {entry.members?.length || 0} members
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                {entry.status === "registered" ? (
+                  entry.kind === "team" ? (
+                    <button
+                      type="button"
+                      disabled={actionLoading || !entry.isLeader}
+                      onClick={() => handleWithdrawTeam(entry.id)}
+                      className="rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                    >
+                      {entry.isLeader ? "Withdraw Team" : "Leader Can Withdraw"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={() => handleWithdrawRegistration(entry.id)}
+                      className="rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                    >
+                      Withdraw
+                    </button>
+                  )
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderCertificates = () => (
+    <div className="space-y-6">
+      <div>
+        <div className="text-2xl font-bold text-slate-900">My Certificates</div>
+        <div className="text-sm text-slate-500">
+          Download your participation and achievement certificates.
+        </div>
+      </div>
+
+      {certificates.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-400">
+          No certificates available yet.
+        </div>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+          {certificates.map((certificate) => (
+            <div key={certificate._id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-900 to-violet-700 p-5 text-white">
+                <div className="text-xs font-semibold uppercase tracking-[0.3em] text-white/70">
+                  SMART Event Manager
+                </div>
+                <div className="mt-5 text-lg font-bold">
+                  {certificate.eventId?.name || "Certificate"}
+                </div>
+                <div className="mt-2 text-sm text-white/75">
+                  {formatCertificateType(certificate.certificateType)}
+                  {certificate.rank ? ` - Rank ${certificate.rank}` : ""}
+                </div>
+                <div className="mt-6 text-xs text-white/60">{certificate.certificateNumber}</div>
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm text-slate-500">
+                <div>Event date: {formatDate(certificate.eventId?.eventDate)}</div>
+                <div>Generated: {formatDate(certificate.generatedAt)}</div>
+              </div>
+
+              <a
+                href={getCertificateDownloadUrl(certificate._id)}
+                className="mt-5 block rounded-2xl bg-violet-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-violet-700"
+              >
+                Download PDF
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const views = {
+    dashboard: renderDashboard(),
+    browse: renderBrowse(),
+    "my-events": renderMyEvents(),
+    certificates: renderCertificates(),
+  };
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-500">
+        Loading participant workspace...
+      </div>
+    );
   }
 
-  @media (max-width: 768px) {
-    .appContainer { flex-direction: column !important; }
-    .sidebar { width: 100% !important; border-right: none !important; border-bottom: 1px solid #e2e8f0 !important; }
-    .contentWrapper { padding: 20px !important; }
-  }
-`;
+  return (
+    <>
+      <div className="flex min-h-screen bg-slate-100">
+        <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white px-4 py-6 lg:block">
+          <div className="mb-8 flex items-center gap-3 px-2">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-black text-white">
+              SEM
+            </div>
+            <div>
+              <div className="text-xs font-black uppercase tracking-[0.3em] text-blue-700">
+                SMART
+              </div>
+              <div className="text-xs text-slate-400">Participant Panel</div>
+            </div>
+          </div>
+
+          <nav className="space-y-1">
+            {[
+              ["dashboard", "Dashboard"],
+              ["browse", "Browse Events"],
+              ["my-events", "My Registrations"],
+              ["certificates", "My Certificates"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveView(id)}
+                className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeView === id
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs uppercase tracking-wide text-slate-400">Signed in as</div>
+            <div className="mt-2 font-semibold text-slate-900">{user?.name}</div>
+            <div className="text-sm text-slate-500">{user?.email}</div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
+            >
+              Logout
+            </button>
+          </div>
+        </aside>
+
+        <main className="flex-1">
+          <div className="border-b border-slate-200 bg-white px-5 py-4 shadow-sm sm:px-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.25em] text-slate-400">Participant</div>
+                <div className="text-xl font-bold text-slate-900">{user?.institution || "Dashboard"}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ["dashboard", "Dashboard"],
+                  ["browse", "Events"],
+                  ["my-events", "Registrations"],
+                  ["certificates", "Certificates"],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveView(id)}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                      activeView === id
+                        ? "bg-blue-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {(error || authError) && (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                {error || authError}
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 py-6 sm:px-6">{views[activeView] || views.dashboard}</div>
+        </main>
+      </div>
+
+      {teamModalEvent ? (
+        <TeamModal
+          key={teamModalEvent._id}
+          event={teamModalEvent}
+          onClose={() => setTeamModalEvent(null)}
+          onCreate={handleCreateTeam}
+          searching={teamSearchLoading}
+          searchResults={teamSearchResults}
+          onSearch={handleTeamSearch}
+          creating={actionLoading}
+        />
+      ) : null}
+    </>
+  );
+}

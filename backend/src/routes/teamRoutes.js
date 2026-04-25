@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   createTeam,
+  getMyTeams,
   getTeamById,
   searchParticipantsByStudentId,
   withdrawTeam,
@@ -17,6 +18,7 @@ router.get(
   allowRoles("participant"),
   searchParticipantsByStudentId
 );
+router.get("/me", authMiddleware, allowRoles("participant"), getMyTeams);
 router.post("/", authMiddleware, allowRoles("participant"), createTeam);
 router.get("/:teamId", authMiddleware, getTeamById);
 router.delete("/:teamId/withdraw", authMiddleware, allowRoles("participant"), withdrawTeam);

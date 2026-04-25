@@ -19,6 +19,7 @@ import {
 } from "../services/eventService";
 import {
   getAdminEventsReport,
+  getAdminCoordinatorAnalytics,
   getOverviewAnalytics,
 } from "../services/analyticsService";
 
@@ -78,6 +79,7 @@ export default function AdminDashboard() {
   const [coordinators, setCoordinators] = useState([]);
   const [overview, setOverview] = useState(null);
   const [eventsReport, setEventsReport] = useState([]);
+  const [coordinatorAnalytics, setCoordinatorAnalytics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -95,13 +97,21 @@ export default function AdminDashboard() {
     setError("");
 
     try {
-      const [{ user }, eventsData, coordinatorsData, overviewData, eventsReportData] =
+      const [
+        { user },
+        eventsData,
+        coordinatorsData,
+        overviewData,
+        eventsReportData,
+        coordinatorAnalyticsData,
+      ] =
         await Promise.all([
           getCurrentUser(),
           getEvents(),
           getCoordinators(),
           getOverviewAnalytics(),
           getAdminEventsReport(),
+          getAdminCoordinatorAnalytics(),
         ]);
 
       if (user.role !== "admin") {
@@ -114,6 +124,7 @@ export default function AdminDashboard() {
       setCoordinators(coordinatorsData.users || []);
       setOverview(overviewData);
       setEventsReport(eventsReportData.events || []);
+      setCoordinatorAnalytics(coordinatorAnalyticsData.coordinators || []);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load admin dashboard.");
       navigate("/login", { replace: true });
@@ -263,7 +274,14 @@ export default function AdminDashboard() {
           />
         );
       case "analytics":
-        return <AnalyticsDashboard overview={overview} loading={loading} />;
+        return (
+          <AnalyticsDashboard
+            overview={overview}
+            eventsReport={eventsReport}
+            coordinatorAnalytics={coordinatorAnalytics}
+            loading={loading}
+          />
+        );
       case "eventanalytics":
         return <EventAnalytics eventsReport={eventsReport} loading={loading} />;
       default:

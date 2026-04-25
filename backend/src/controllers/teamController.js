@@ -162,6 +162,20 @@ export const getTeamById = async (req, res, next) => {
   }
 };
 
+export const getMyTeams = async (req, res, next) => {
+  try {
+    const teams = await Team.find({ "members.userId": req.user._id })
+      .populate("leaderId", "name email studentId contactNumber")
+      .populate("eventId", "name eventType participationType eventDate venue status")
+      .populate("members.userId", "name email gender institution studentId contactNumber")
+      .sort({ createdAt: -1 });
+
+    res.json({ teams, count: teams.length });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const withdrawTeam = async (req, res, next) => {
   try {
     const team = await Team.findById(req.params.teamId);
