@@ -197,6 +197,54 @@ export const getEventTeams = async (req, res, next) => {
   }
 };
 
+export const updateTeamParticipationStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+
+    if (!["participated", "absent", "registered"].includes(status)) {
+      return res.status(400).json({
+        message: "Status must be participated, absent, or registered",
+      });
+    }
+
+    const team = await Team.findById(req.params.teamId)
+      .populate("leaderId", "name email studentId")
+      .populate("eventId", "name status participationType");
+
+    if (!team) {
+      return res.status(404).json({ message: "Team not found" });
+    }
+
+    if (team.eventId._id.toString() !== req.params.eventId) {
+      return res.status(400).json({ message: "Team does not belong to this event" });
+    }
+
+    if (team.status === "withdrawn") {
+      return res.status(400).json({ message: "Withdrawn teams cannot be updated" });
+    }
+
+    if (team.eventId.participationType !== "team") {
+      return res.status(400).json({ message: "Use participant controls for individual events" });
+    }
+
+    team.status = status;
+
+    if (status !== "participated") {
+      team.isWinner = false;
+      team.rank = undefined;
+    }
+
+    await team.save();
+
+    res.json({
+      message: "Team status updated successfully",
+      team,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const removeTeamByManager = async (req, res, next) => {
   try {
     const team = await Team.findById(req.params.teamId)

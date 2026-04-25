@@ -20,14 +20,37 @@ export const markWinner = async (req, res, next) => {
       return res.status(400).json({ message: "Provide either participantId or teamId, not both" });
     }
 
+    if (![1, 2, 3].includes(Number(rank))) {
+      return res.status(400).json({ message: "Rank must be 1, 2, or 3" });
+    }
+
     if (participantId) {
       const registration = await Registration.findOne({ eventId, participantId });
       if (!registration) {
         return res.status(404).json({ message: "Participant registration not found" });
       }
 
+      if (registration.status !== "participated") {
+        return res.status(400).json({
+          message: "Only participants marked as participated can be winners",
+        });
+      }
+
+      const duplicateRank = await Registration.findOne({
+        eventId,
+        isWinner: true,
+        rank: Number(rank),
+        participantId: { $ne: participantId },
+      });
+
+      if (duplicateRank) {
+        return res.status(409).json({
+          message: `Rank ${rank} is already assigned to another participant`,
+        });
+      }
+
       registration.isWinner = true;
-      registration.rank = rank;
+      registration.rank = Number(rank);
       await registration.save();
 
       return res.json({ message: "Participant marked as winner", winner: registration });
@@ -38,8 +61,27 @@ export const markWinner = async (req, res, next) => {
       return res.status(404).json({ message: "Team not found for this event" });
     }
 
+    if (team.status !== "participated") {
+      return res.status(400).json({
+        message: "Only teams marked as participated can be winners",
+      });
+    }
+
+    const duplicateRank = await Team.findOne({
+      eventId,
+      isWinner: true,
+      rank: Number(rank),
+      _id: { $ne: teamId },
+    });
+
+    if (duplicateRank) {
+      return res.status(409).json({
+        message: `Rank ${rank} is already assigned to another team`,
+      });
+    }
+
     team.isWinner = true;
-    team.rank = rank;
+    team.rank = Number(rank);
     await team.save();
 
     res.json({ message: "Team marked as winner", winner: team });
@@ -67,6 +109,47 @@ export const getWinners = async (req, res, next) => {
       teamWinners,
       count: participantWinners.length + teamWinners.length,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const clearWinner = async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+    const { participantId, teamId } = req.body;
+
+    if (!participantId && !teamId) {
+      return res.status(400).json({ message: "participantId or teamId is required" });
+    }
+
+    if (participantId && teamId) {
+      return res.status(400).json({ message: "Provide either participantId or teamId, not both" });
+    }
+
+    if (participantId) {
+      const registration = await Registration.findOne({ eventId, participantId });
+      if (!registration) {
+        return res.status(404).json({ message: "Participant registration not found" });
+      }
+
+      registration.isWinner = false;
+      registration.rank = undefined;
+      await registration.save();
+
+      return res.json({ message: "Participant winner cleared", winner: registration });
+    }
+
+    const team = await Team.findOne({ _id: teamId, eventId });
+    if (!team) {
+      return res.status(404).json({ message: "Team not found for this event" });
+    }
+
+    team.isWinner = false;
+    team.rank = undefined;
+    await team.save();
+
+    res.json({ message: "Team winner cleared", winner: team });
   } catch (error) {
     next(error);
   }

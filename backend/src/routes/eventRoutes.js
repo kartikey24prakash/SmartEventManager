@@ -7,14 +7,20 @@ import {
   getEventById,
   getEvents,
   removeCoordinator,
+  updateEventLifecycleStatus,
   updateEvent,
 } from "../controllers/eventController.js";
 import {
   getEventRegistrations,
   removeRegistrationByManager,
+  updateRegistrationParticipationStatus,
 } from "../controllers/registerationController.js";
-import { getEventTeams, removeTeamByManager } from "../controllers/teamController.js";
-import { getWinners, markWinner } from "../controllers/winnerController.js";
+import {
+  getEventTeams,
+  removeTeamByManager,
+  updateTeamParticipationStatus,
+} from "../controllers/teamController.js";
+import { clearWinner, getWinners, markWinner } from "../controllers/winnerController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import ensureCoordinatorEventAccess from "../middleware/eventAccessMiddleware.js";
 import allowRoles from "../middleware/roleMiddleware.js";
@@ -68,6 +74,30 @@ router.delete(
   removeTeamByManager
 );
 
+router.patch(
+  "/:eventId/status",
+  authMiddleware,
+  allowRoles("admin", "coordinator"),
+  ensureCoordinatorEventAccess,
+  updateEventLifecycleStatus
+);
+
+router.patch(
+  "/:eventId/registrations/:registrationId/status",
+  authMiddleware,
+  allowRoles("admin", "coordinator"),
+  ensureCoordinatorEventAccess,
+  updateRegistrationParticipationStatus
+);
+
+router.patch(
+  "/:eventId/teams/:teamId/status",
+  authMiddleware,
+  allowRoles("admin", "coordinator"),
+  ensureCoordinatorEventAccess,
+  updateTeamParticipationStatus
+);
+
 router.post(
   "/:eventId/winners",
   authMiddleware,
@@ -82,6 +112,14 @@ router.get(
   allowRoles("admin", "coordinator"),
   ensureCoordinatorEventAccess,
   getWinners
+);
+
+router.delete(
+  "/:eventId/winners",
+  authMiddleware,
+  allowRoles("admin", "coordinator"),
+  ensureCoordinatorEventAccess,
+  clearWinner
 );
 
 export default router;

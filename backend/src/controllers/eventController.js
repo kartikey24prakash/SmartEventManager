@@ -249,3 +249,49 @@ export const removeCoordinator = async (req, res, next) => {
     next(error);
   }
 };
+
+export const updateEventLifecycleStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+
+    if (!["ongoing", "completed"].includes(status)) {
+      return res.status(400).json({
+        message: "Status can only be updated to ongoing or completed from this endpoint",
+      });
+    }
+
+    const event = await Event.findById(req.params.eventId);
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    if (status === "completed") {
+      const [participatedRegistrations, participatedTeams] = await Promise.all([
+        Registration.countDocuments({
+          eventId: event._id,
+          status: "participated",
+        }),
+        Team.countDocuments({
+          eventId: event._id,
+          status: "participated",
+        }),
+      ]);
+
+      if (participatedRegistrations === 0 && participatedTeams === 0) {
+        return res.status(400).json({
+          message: "Mark at least one participant or team as participated before completing the event",
+        });
+      }
+    }
+
+    event.status = status;
+    await event.save();
+
+    res.json({
+      message: `Event marked as ${status}`,
+      event,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

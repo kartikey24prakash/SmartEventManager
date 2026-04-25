@@ -11,6 +11,87 @@ const buildCertificateNumber = (eventId, participantId) =>
     .toString()
     .slice(-4)}-${Date.now()}`;
 
+const assertCertificateEligibility = async ({
+  participantId,
+  eventId,
+  certificateType,
+  teamId,
+  rank,
+}) => {
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return { status: 404, message: "Event not found" };
+  }
+
+  if (event.participationType === "individual") {
+    const registration = await Registration.findOne({ participantId, eventId });
+
+    if (!registration) {
+      return { status: 400, message: "Participant is not registered for this event" };
+    }
+
+    if (certificateType === "participation" && registration.status !== "participated") {
+      return {
+        status: 400,
+        message: "Only participants marked as participated can receive participation certificates",
+      };
+    }
+
+    if (
+      ["achievement", "winner"].includes(certificateType) &&
+      (!registration.isWinner || ![1, 2, 3].includes(Number(registration.rank)))
+    ) {
+      return {
+        status: 400,
+        message: "Only winner participants with rank 1, 2, or 3 can receive achievement certificates",
+      };
+    }
+
+    return {
+      event,
+      resolvedRank: registration.rank,
+      teamId: undefined,
+    };
+  }
+
+  if (!teamId) {
+    return { status: 400, message: "teamId is required for team event certificates" };
+  }
+
+  const team = await Team.findById(teamId);
+  if (!team || team.eventId.toString() !== eventId.toString()) {
+    return { status: 404, message: "Team not found for this event" };
+  }
+
+  const isMember = team.members.some((member) => member.userId.toString() === participantId.toString());
+  if (!isMember) {
+    return { status: 400, message: "Participant is not a member of this team" };
+  }
+
+  if (certificateType === "participation" && team.status !== "participated") {
+    return {
+      status: 400,
+      message: "Only team members who actually participated can receive participation certificates",
+    };
+  }
+
+  if (
+    ["achievement", "winner"].includes(certificateType) &&
+    (!team.isWinner || ![1, 2, 3].includes(Number(team.rank)))
+  ) {
+    return {
+      status: 400,
+      message: "Only winner teams with rank 1, 2, or 3 can receive achievement certificates",
+    };
+  }
+
+  return {
+    event,
+    resolvedRank: team.rank,
+    teamId: team._id,
+  };
+};
+
 export const generateCertificate = async (req, res, next) => {
   try {
     const {
@@ -21,25 +102,21 @@ export const generateCertificate = async (req, res, next) => {
       rank,
     } = req.body;
 
-    const [participant, event] = await Promise.all([
-      User.findById(participantId),
-      Event.findById(eventId),
-    ]);
-
-    if (!participant || !event) {
-      return res.status(404).json({ message: "Participant or event not found" });
+    const participant = await User.findById(participantId);
+    if (!participant) {
+      return res.status(404).json({ message: "Participant not found" });
     }
 
-    if (teamId) {
-      const team = await Team.findById(teamId);
-      if (!team) {
-        return res.status(404).json({ message: "Team not found" });
-      }
-    } else {
-      const registration = await Registration.findOne({ participantId, eventId });
-      if (!registration) {
-        return res.status(400).json({ message: "Participant is not registered for this event" });
-      }
+    const eligibility = await assertCertificateEligibility({
+      participantId,
+      eventId,
+      certificateType,
+      teamId,
+      rank,
+    });
+
+    if (eligibility.message) {
+      return res.status(eligibility.status).json({ message: eligibility.message });
     }
 
     const existing = await Certificate.findOne({ participantId, eventId, certificateType });
@@ -51,12 +128,12 @@ export const generateCertificate = async (req, res, next) => {
     }
 
     const certificate = await Certificate.create({
-      certificateNumber: buildCertificateNumber(event._id, participant._id),
+      certificateNumber: buildCertificateNumber(eligibility.event._id, participant._id),
       participantId,
       eventId,
-      teamId,
+      teamId: eligibility.teamId,
       certificateType,
-      rank,
+      rank: eligibility.resolvedRank ?? rank,
       generatedBy: req.user._id,
     });
 
@@ -150,20 +227,39 @@ export const batchGenerateCertificates = async (req, res, next) => {
     if (event.participationType === "individual") {
       const registrations = await Registration.find({
         eventId,
-        status: { $ne: "withdrawn" },
+        status:
+          certificateType === "participation"
+            ? "participated"
+            : { $in: ["participated"] },
       });
 
-      targets = registrations.map((registration) => ({
-        participantId: registration.participantId,
-        rank: registration.rank,
-      }));
+      targets = registrations
+        .filter((registration) =>
+          certificateType === "participation"
+            ? registration.status === "participated"
+            : registration.isWinner && [1, 2, 3].includes(Number(registration.rank))
+        )
+        .map((registration) => ({
+          participantId: registration.participantId,
+          rank: registration.rank,
+        }));
     } else {
       const teams = await Team.find({
         eventId,
-        status: { $ne: "withdrawn" },
+        status:
+          certificateType === "participation"
+            ? "participated"
+            : { $in: ["participated"] },
       });
 
       teams.forEach((team) => {
+        if (
+          certificateType !== "participation" &&
+          (!team.isWinner || ![1, 2, 3].includes(Number(team.rank)))
+        ) {
+          return;
+        }
+
         team.members.forEach((member) => {
           targets.push({
             participantId: member.userId,

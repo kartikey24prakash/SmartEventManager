@@ -115,6 +115,54 @@ export const getEventRegistrations = async (req, res, next) => {
   }
 };
 
+export const updateRegistrationParticipationStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+
+    if (!["participated", "absent", "registered"].includes(status)) {
+      return res.status(400).json({
+        message: "Status must be participated, absent, or registered",
+      });
+    }
+
+    const registration = await Registration.findById(req.params.registrationId)
+      .populate("participantId", "name email studentId")
+      .populate("eventId", "name status participationType");
+
+    if (!registration) {
+      return res.status(404).json({ message: "Registration not found" });
+    }
+
+    if (registration.eventId._id.toString() !== req.params.eventId) {
+      return res.status(400).json({ message: "Registration does not belong to this event" });
+    }
+
+    if (registration.status === "withdrawn") {
+      return res.status(400).json({ message: "Withdrawn registrations cannot be updated" });
+    }
+
+    if (registration.eventId.participationType !== "individual") {
+      return res.status(400).json({ message: "Use team participation controls for team events" });
+    }
+
+    registration.status = status;
+
+    if (status !== "participated") {
+      registration.isWinner = false;
+      registration.rank = undefined;
+    }
+
+    await registration.save();
+
+    res.json({
+      message: "Participant status updated successfully",
+      registration,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const removeRegistrationByManager = async (req, res, next) => {
   try {
     const registration = await Registration.findById(req.params.registrationId)
